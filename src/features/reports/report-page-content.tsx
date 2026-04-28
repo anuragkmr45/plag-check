@@ -21,7 +21,7 @@ type ReportPageContentProps = {
 export function ReportPageContent({
   report
 }: ReportPageContentProps): React.JSX.Element {
-  const metadataEntries = formatMetadataEntries(report.scan.providerMetadata);
+  const metadataEntries = getUserFacingMetadataEntries(report.scan.providerMetadata);
   const providerBadge = getProviderBadge(report.scan.providerMetadata);
   const academicMatches = getAcademicMatches(report.scan.providerMetadata);
   const writingNotes = getWritingPatternNotes(report.scan.providerMetadata);
@@ -217,7 +217,7 @@ export function ReportPageContent({
 
           <section className="rounded-lg border border-slate-200 bg-white">
             <SectionHeader
-              description="OpenAlex metadata is used only as a demo academic discovery signal."
+              description="Academic metadata is used only as a demo discovery signal."
               title="Academic metadata matches"
             />
             {academicMatches.length > 0 ? (
@@ -407,8 +407,8 @@ export function ReportPageContent({
 
           <section className="rounded-lg border border-slate-200 bg-white">
             <SectionHeader
-              description="Subprovider calls and fallback state for this scan."
-              title="Demo provider status"
+              description="Feature-level live or fallback state for this scan."
+              title="Feature fallback status"
             />
             {subproviderStatuses.length > 0 ? (
               <dl className="space-y-3 p-5 text-sm">
@@ -427,8 +427,8 @@ export function ReportPageContent({
 
           <section className="rounded-lg border border-slate-200 bg-white">
             <SectionHeader
-              description="Provider details are stored with the scan result."
-              title="Provider metadata"
+              description="User-facing scan details stored with the result."
+              title="Scan metadata"
             />
             {metadataEntries.length > 0 ? (
               <dl className="space-y-3 p-5 text-sm">
@@ -876,17 +876,48 @@ function getSubproviderStatuses(metadata: unknown): Array<{
 
   return Object.entries(subproviders).map(([key, value]) => {
     const status = toRecord(value);
-    const provider =
-      typeof status?.provider === "string" ? status.provider : "unknown";
-    const fallback = status?.fallback === true ? "fallback" : "live";
-    const reason =
-      typeof status?.reason === "string" ? ` · ${status.reason}` : "";
 
     return {
-      label: key,
-      value: `${provider} · ${fallback}${reason}`
+      label: getFeatureStatusLabel(key),
+      value:
+        status?.fallback === true
+          ? "Local fallback used"
+          : "Live feature completed"
     };
   });
+}
+
+function getUserFacingMetadataEntries(metadata: unknown): ReturnType<
+  typeof formatMetadataEntries
+> {
+  const record = toRecord(metadata);
+
+  if (!record) {
+    return [];
+  }
+
+  return formatMetadataEntries({
+    aiConfidenceBand: record.aiConfidenceBand,
+    fallback: record.fallback,
+    generatedAt: record.generatedAt,
+    originalWordCount: record.originalWordCount,
+    scannedWordCount: record.scannedWordCount
+  });
+}
+
+function getFeatureStatusLabel(key: string): string {
+  switch (key) {
+    case "web":
+      return "Web Source Matching";
+    case "ai":
+      return "AI Writing Analysis";
+    case "academic":
+      return "Academic Source Lookup";
+    case "grammar":
+      return "Grammar Review";
+    default:
+      return key;
+  }
 }
 
 function buildHighlightedChunks(report: ReportJson): HighlightedChunk[] {

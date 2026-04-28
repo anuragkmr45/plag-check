@@ -1,4 +1,4 @@
-import { and, count, desc, eq } from "drizzle-orm";
+import { and, count, desc, eq, sql } from "drizzle-orm";
 import { z } from "zod";
 import {
   DEFAULT_PREPROCESS_OPTIONS,
@@ -19,6 +19,7 @@ export type PreprocessingSummary = {
   originalWordCount: number;
   removedWordCount: number;
   rulesApplied: PreprocessRulesApplied;
+  sanitizedTextLength: number;
   sanitizedWordCount: number;
 };
 
@@ -166,6 +167,7 @@ export async function preprocessSubmissionText(
         originalWordCount: schema.preprocessingRuns.originalWordCount,
         removedWordCount: schema.preprocessingRuns.removedWordCount,
         rulesApplied: schema.preprocessingRuns.rulesApplied,
+        sanitizedTextLength: sql<number>`char_length(${schema.preprocessingRuns.sanitizedText})::int`,
         sanitizedWordCount: schema.preprocessingRuns.sanitizedWordCount
       });
 
@@ -272,6 +274,7 @@ async function getLatestPreprocessingSummary(
       originalWordCount: schema.preprocessingRuns.originalWordCount,
       removedWordCount: schema.preprocessingRuns.removedWordCount,
       rulesApplied: schema.preprocessingRuns.rulesApplied,
+      sanitizedTextLength: sql<number>`char_length(${schema.preprocessingRuns.sanitizedText})::int`,
       sanitizedWordCount: schema.preprocessingRuns.sanitizedWordCount
     })
     .from(schema.preprocessingRuns)

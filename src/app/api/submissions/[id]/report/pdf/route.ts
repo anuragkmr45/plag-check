@@ -3,6 +3,7 @@ import {
   ReportPdfNotFoundError,
   generateSubmissionReportPdf
 } from "../../../../../../features/reports/report-export.service";
+import { FeatureBudgetExhaustedError } from "../../../../../../features/budgets/feature-budget.service";
 import {
   csrfErrorResponse,
   jsonError
@@ -62,6 +63,10 @@ export async function GET(
   } catch (error) {
     if (error instanceof ReportPdfNotFoundError) {
       return jsonError({ message: "Not found", status: 404 });
+    }
+
+    if (error instanceof FeatureBudgetExhaustedError) {
+      return jsonError({ message: error.message, status: 409 });
     }
 
     throw error;

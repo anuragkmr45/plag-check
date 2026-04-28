@@ -2,6 +2,10 @@
 
 import { useRouter } from "next/navigation";
 import { useState, type FormEvent } from "react";
+import {
+  ScanCostPreview,
+  type UiScanMode
+} from "../budgets/scan-cost-preview";
 
 type QuickTextScanFormProps = {
   defaultTitle?: string;
@@ -34,6 +38,8 @@ export function QuickTextScanForm({
   const router = useRouter();
   const [error, setError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [scanMode, setScanMode] = useState<UiScanMode>("standard");
+  const [text, setText] = useState("");
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -43,6 +49,7 @@ export function QuickTextScanForm({
     const title = String(formData.get("title") ?? "").trim();
     const text = String(formData.get("text") ?? "").trim();
     const tenantId = String(formData.get("tenantId") ?? "").trim();
+    const selectedScanMode = parseScanMode(formData.get("scanMode"));
 
     if (!title || !text) {
       setError("Enter a title and text to scan.");
@@ -93,7 +100,9 @@ export function QuickTextScanForm({
       );
       await postJson<ApiErrorResponse>(
         `/api/submissions/${created.submission.id}/scan`,
-        {}
+        {
+          scanMode: selectedScanMode
+        }
       );
 
       router.push(`/submissions/${created.submission.id}`);
@@ -183,9 +192,18 @@ export function QuickTextScanForm({
           id={`${modeLabel}-text`}
           maxLength={12000}
           name="text"
+          onChange={(event) => setText(event.currentTarget.value)}
           required
         />
       </div>
+
+      <ScanModeSelector onChange={setScanMode} value={scanMode} />
+
+      <ScanCostPreview
+        charCount={text.length}
+        scanMode={scanMode}
+        wordCount={countWords(text)}
+      />
 
       {error ? (
         <p
@@ -204,6 +222,42 @@ export function QuickTextScanForm({
         {isSubmitting ? "Queuing scan" : `Start ${modeLabel}`}
       </button>
     </form>
+  );
+}
+
+function ScanModeSelector({
+  onChange,
+  value
+}: {
+  onChange: (value: UiScanMode) => void;
+  value: UiScanMode;
+}): React.JSX.Element {
+  return (
+    <fieldset className="space-y-2">
+      <legend className="text-sm font-medium text-slate-800">Scan mode</legend>
+      <div className="grid gap-2 sm:grid-cols-3">
+        {[
+          ["standard", "Standard Check"],
+          ["deep", "Deep Check"],
+          ["fallback", "Local Fallback Check"]
+        ].map(([mode, label]) => (
+          <label
+            className="flex items-center gap-2 rounded-md border border-slate-200 px-3 py-2 text-sm text-slate-700"
+            key={mode}
+          >
+            <input
+              checked={value === mode}
+              className="h-4 w-4 border-slate-300"
+              name="scanMode"
+              onChange={() => onChange(mode as UiScanMode)}
+              type="radio"
+              value={mode}
+            />
+            <span>{label}</span>
+          </label>
+        ))}
+      </div>
+    </fieldset>
   );
 }
 
@@ -246,4 +300,14 @@ function buildSafeFilename(title: string): string {
     .replace(/^-+|-+$/g, "");
 
   return safeTitle || "demo-text";
+}
+
+function countWords(value: string): number {
+  return value.trim().split(/\s+/).filter(Boolean).length;
+}
+
+function parseScanMode(value: FormDataEntryValue | null): UiScanMode {
+  return value === "deep" || value === "fallback" || value === "standard"
+    ? value
+    : "standard";
 }

@@ -1,4 +1,7 @@
+import Link from "next/link";
+import { getTenantFeatureBudgets } from "../../../../features/budgets/feature-budget.service";
 import { getEditableTenantSettings } from "../../../../features/tenants/tenant-settings.service";
+import { listSubmissionCreateTenantOptions } from "../../../../features/tenants/tenant-options.service";
 import { getRequiredSessionWithRole } from "../../../../lib/auth/server";
 import { TENANT_ADMIN_ROLES } from "../../../../lib/rbac/roles";
 import { updateTenantSettingsAction } from "./actions";
@@ -6,6 +9,7 @@ import { updateTenantSettingsAction } from "./actions";
 type AdminSettingsPageProps = {
   searchParams?: Promise<{
     saved?: string;
+    tenantId?: string;
   }>;
 };
 
@@ -13,8 +17,15 @@ export default async function AdminSettingsPage({
   searchParams
 }: AdminSettingsPageProps): Promise<React.JSX.Element> {
   const session = await getRequiredSessionWithRole(TENANT_ADMIN_ROLES);
-  const editableSettings = await getEditableTenantSettings(session.user);
+  const tenantOptions = await listSubmissionCreateTenantOptions(session.user);
   const params = searchParams ? await searchParams : {};
+  const selectedTenantId =
+    session.user.role === "SUPER_ADMIN"
+      ? params.tenantId ?? tenantOptions[0]?.id
+      : session.user.tenantId ?? undefined;
+  const editableSettings = await getEditableTenantSettings(session.user, {
+    tenantId: selectedTenantId
+  });
   const saved = params.saved === "1";
 
   if (!editableSettings) {
@@ -37,6 +48,7 @@ export default async function AdminSettingsPage({
   }
 
   const { settings, tenant } = editableSettings;
+  const featureBudgets = await getTenantFeatureBudgets(tenant.id);
 
   return (
     <section className="space-y-6">
@@ -46,6 +58,29 @@ export default async function AdminSettingsPage({
           Tenant settings
         </h1>
       </div>
+
+      {tenantOptions.length > 0 ? (
+        <section className="rounded-lg border border-slate-200 bg-white p-5">
+          <h2 className="text-base font-semibold text-slate-950">
+            Tenant selector
+          </h2>
+          <div className="mt-3 flex flex-wrap gap-2">
+            {tenantOptions.map((option) => (
+              <Link
+                className={`rounded-md border px-3 py-2 text-sm font-medium ${
+                  option.id === tenant.id
+                    ? "border-slate-950 bg-slate-950 text-white"
+                    : "border-slate-300 text-slate-700 hover:bg-slate-50"
+                }`}
+                href={`/admin/settings?tenantId=${option.id}`}
+                key={option.id}
+              >
+                {option.name}
+              </Link>
+            ))}
+          </div>
+        </section>
+      ) : null}
 
       {saved ? (
         <div className="rounded-lg border border-emerald-200 bg-emerald-50 p-4 text-sm font-medium text-emerald-900">
@@ -57,6 +92,7 @@ export default async function AdminSettingsPage({
         action={updateTenantSettingsAction}
         className="space-y-6 rounded-lg border border-slate-200 bg-white p-5"
       >
+        <input name="tenantId" type="hidden" value={tenant.id} />
         <section className="space-y-4">
           <div>
             <h2 className="text-base font-semibold text-slate-950">Branding</h2>
@@ -103,6 +139,40 @@ export default async function AdminSettingsPage({
                 rows={4}
               />
             </Field>
+          </div>
+        </section>
+
+        <section className="space-y-4">
+          <div>
+            <h2 className="text-base font-semibold text-slate-950">
+              Feature budgets
+            </h2>
+            <p className="mt-1 text-sm text-slate-600">
+              Monthly feature limits protect demo capacity while preserving
+              local fallback behavior.
+            </p>
+          </div>
+          <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+            {featureBudgets.map((budget) => (
+              <Field
+                key={budget.featureKey}
+                label={budget.featureLabel}
+                name={`budget_${budget.featureKey}`}
+              >
+                <input
+                  className={inputClassName}
+                  defaultValue={budget.limit}
+                  id={`budget_${budget.featureKey}`}
+                  min={1}
+                  name={`budget_${budget.featureKey}`}
+                  step={1}
+                  type="number"
+                />
+                <p className="mt-1 text-xs text-slate-500">
+                  {budget.remaining.toLocaleString("en")} remaining this month
+                </p>
+              </Field>
+            ))}
           </div>
         </section>
 

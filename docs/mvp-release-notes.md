@@ -14,6 +14,9 @@ Included:
 - OpenAlex academic metadata discovery.
 - LanguageTool public grammar/spell checking.
 - Mock and heuristic fallbacks with `provider_metadata.fallback=true`.
+- Feature budgets and rate limits for Full Checks, Web Source Matching, AI Writing Analysis, Academic Source Lookup, Grammar Review, PDF Reports, Fallback Scans, and Monthly Words Processed.
+- Dashboard feature-capacity cards that use feature labels only and do not expose internal vendor/API names.
+- Scan mode selection for Standard Check, Deep Check, and Local Fallback Check with scan-cost previews.
 - Demo seed script for non-empty dashboards, reports, and reviewer queue.
 - Dedicated checker pages for plagiarism, AI detection, grammar, reports, and new scans.
 - Report UI with provider badge, fallback status, source matches, academic metadata, AI sections, grammar findings, highlighted chunks, exclusions, PDF export, reviewer notes, and demo disclaimer.

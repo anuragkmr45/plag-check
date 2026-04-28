@@ -3,6 +3,7 @@ import { mockScanProvider } from "../src/features/scanning/providers";
 
 const scanInput = {
   originalWordCount: 28,
+  scanMode: "standard",
   scannedWordCount: 24,
   submissionId: "00000000-0000-4000-8000-000000000001",
   tenantId: "00000000-0000-4000-8000-000000000002",
@@ -11,7 +12,7 @@ const scanInput = {
     "As an AI language model, this sentence uses a mock indicator.",
     "This line has teh typo and  repeated spacing."
   ].join(" ")
-};
+} as const;
 
 describe("mock scan provider", () => {
   it("returns deterministic scan results for the same input", async () => {

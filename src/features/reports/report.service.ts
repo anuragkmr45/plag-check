@@ -11,7 +11,7 @@ import {
 export const STANDARD_REPORT_DISCLAIMER =
   "Similarity and AI scores are indicators only. Final academic or administrative action must be based on human review and institutional policy.";
 export const DEMO_REAL_REPORT_DISCLAIMER =
-  "Demo Real uses Tavily, Gemini, OpenAlex, and LanguageTool/free APIs. Results are for demonstration and review support only, not certified plagiarism proof.";
+  "Demo Real uses configured web, AI-writing, academic metadata, and grammar services with local fallbacks. Results are for demonstration and review support only, not certified plagiarism proof.";
 
 export type ReportJson = {
   disclaimer: string;

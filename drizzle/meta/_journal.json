@@ -57,6 +57,13 @@
       "when": 1777329823034,
       "tag": "0007_famous_valkyrie",
       "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1777356962672,
+      "tag": "0008_quiet_callisto",
+      "breakpoints": true
     }
   ]
 }

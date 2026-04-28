@@ -19,6 +19,7 @@ const scanJob: ScanJob = {
   finishedAt: null,
   id: "00000000-0000-4000-8000-000000000101",
   provider: "mock",
+  scanMode: "standard",
   startedAt: new Date("2026-04-28T00:01:00.000Z"),
   status: "RUNNING",
   submissionId: "00000000-0000-4000-8000-000000000201",

@@ -42,6 +42,20 @@ Fallbacks are deterministic:
 - Academic metadata returns empty or seeded demo metadata.
 - Grammar checks use repeated-word, common-misspelling, whitespace, and long-sentence rules.
 
+## Feature Budgets
+
+Demo Real is guarded by feature budgets and rate limits so demo credits are not exhausted:
+
+- Web Source Matching is checked before web-source discovery.
+- AI Writing Analysis is checked before AI likelihood analysis and capped to 8,000 input tokens plus 1,024 output tokens.
+- Academic Source Lookup is checked before academic metadata lookup.
+- Grammar Review is checked before grammar review and capped to 18,000 characters in Standard Check or 36,000 characters in Deep Check.
+- PDF Reports are counted when PDF exports are generated.
+
+The dashboard and budget UI show feature labels only. Internal provider names may remain in stored metadata for debugging, but user-facing budget cards do not show vendor/API names.
+
+See `docs/feature-budgets-and-rate-limits.md` for the exact defaults.
+
 ## Running Locally
 
 ```bash

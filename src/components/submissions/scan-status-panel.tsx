@@ -2,12 +2,16 @@ import Link from "next/link";
 import type { SubmissionScanSummary } from "../../server/services/scanning.service";
 import type { SubmissionStatus } from "../../server/services/submissions.service";
 import { ScanSubmissionButton } from "./scan-submission-button";
+import { SubmissionStatusAutoRefresh } from "./submission-status-auto-refresh";
 
 type ScanStatusPanelProps = {
+  charCount?: number;
   hasPreprocessing: boolean;
+  statusUpdatedAt: Date;
   scanSummary: SubmissionScanSummary | null;
   status: SubmissionStatus;
   submissionId: string;
+  wordCount?: number;
 };
 
 type TimelineStep = {
@@ -39,15 +43,23 @@ const lifecycleSteps = [
 ] as const;
 
 export function ScanStatusPanel({
+  charCount = 0,
   hasPreprocessing,
+  statusUpdatedAt,
   scanSummary,
   status,
-  submissionId
+  submissionId,
+  wordCount = 0
 }: ScanStatusPanelProps): React.JSX.Element {
   const latestResult = status === "SCAN_COMPLETE" ? scanSummary?.latestResult : null;
 
   return (
     <section className="rounded-lg border border-slate-200 bg-white">
+      <SubmissionStatusAutoRefresh
+        initialStatus={status}
+        initialUpdatedAt={statusUpdatedAt.toISOString()}
+        submissionId={submissionId}
+      />
       <div className="border-b border-slate-200 px-5 py-4">
         <h2 className="text-base font-semibold text-slate-950">
           Scan lifecycle
@@ -96,7 +108,11 @@ export function ScanStatusPanel({
         </div>
 
         {shouldShowScanAction(status, hasPreprocessing) ? (
-          <ScanSubmissionButton submissionId={submissionId} />
+          <ScanSubmissionButton
+            charCount={charCount}
+            submissionId={submissionId}
+            wordCount={wordCount}
+          />
         ) : null}
 
         {latestResult ? (

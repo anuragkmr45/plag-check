@@ -21,6 +21,7 @@ This UAT record covers the local complete demo build, not production deployment 
 | Submissions | PASS | Authenticated smoke returned 200 for `/submissions` and `/submissions/[id]`. |
 | Reports | PASS | Authenticated smoke returned 200 for `/reports`, `/submissions/[id]/report`, and PDF export. |
 | Reviewer queue | PASS | Authenticated smoke returned 200 for `/reviewer/queue` and `/reviewer/cases/[id]`. |
+| Feature budgets | PASS | Added budget/rate-limit tests for scan estimates, caps, blocking logic, dashboard state, and vendor-free labels. |
 
 ## Command Evidence
 
@@ -34,6 +35,7 @@ This UAT record covers the local complete demo build, not production deployment 
 - Direct provider smoke: PASS, current `.env` returned live Tavily, Gemini, OpenAlex, and LanguageTool statuses without fallback.
 - `/api/health`: PASS, 200
 - Authenticated page smoke: PASS for all listed demo pages
+- Feature budget unit tests: PASS, standard/deep estimates, one-feature fallback allowance, all-feature exhausted block logic, AI cap, grammar cap, and 300 standard scans x 3 Web Source Matching units = 900 units.
 
 Notes:
 
@@ -46,3 +48,4 @@ Notes:
 - Tavily and Gemini live behavior depends on valid API keys.
 - OpenAlex and LanguageTool are public/free API integrations and may rate-limit.
 - Production deployment still requires hosting, SSL, production secrets, backups, legal/privacy approval, security review, and UAT sign-off.
+- Feature budgets are demo safeguards. They are not a production billing or certified provider contract system.

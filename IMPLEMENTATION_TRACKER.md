@@ -5024,3 +5024,134 @@ Production blockers:
 - Real scan provider contract/API keys are not provided; MVP remains on the mock provider unless approved later.
 
 Final MVP status: VERIFIED for implementation; NOT DEPLOYMENT-SIGNED-OFF until production blockers are resolved.
+
+---
+
+# Demo Feature Budget And Rate-Limit Overlay
+
+Status: VERIFIED
+
+Verification date: 2026-04-28 11:53:19 IST
+
+Changed files:
+- AGENTS.md
+- IMPLEMENTATION_TRACKER.md
+- .env.example
+- .env.demo.example
+- env.demo-ready.example
+- docs/feature-budgets-and-rate-limits.md
+- docs/demo-real-provider.md
+- docs/demo-ui-flow.md
+- docs/uat-results.md
+- docs/mvp-release-notes.md
+- drizzle/0008_quiet_callisto.sql
+- drizzle/meta/0008_snapshot.json
+- drizzle/meta/_journal.json
+- src/lib/env.ts
+- src/lib/db/schema.ts
+- src/lib/jobs/scan-queue.ts
+- src/features/budgets/feature-budget.service.ts
+- src/features/budgets/feature-rate-limit.service.ts
+- src/features/scanning/providers/types.ts
+- src/features/scanning/providers/demo-real.provider.ts
+- src/server/services/scanning.service.ts
+- src/server/services/preprocessing.service.ts
+- src/app/api/submissions/[id]/scan/route.ts
+- src/app/api/submissions/[id]/report/pdf/route.ts
+- src/components/budgets/scan-cost-preview.tsx
+- src/components/scanning/quick-text-scan-form.tsx
+- src/components/submissions/scan-status-panel.tsx
+- src/components/submissions/scan-submission-button.tsx
+- src/app/(dashboard)/submissions/[id]/page.tsx
+- src/features/analytics/analytics.service.ts
+- src/features/analytics/admin-analytics-dashboard.tsx
+- src/features/reports/report-export.service.ts
+- src/features/reports/report-page-content.tsx
+- src/features/reports/report.service.ts
+- src/features/tenants/tenant-settings.service.ts
+- src/app/(dashboard)/admin/settings/actions.ts
+- src/app/(dashboard)/admin/settings/page.tsx
+- tests/feature-budget-service.test.ts
+- tests/env.test.ts
+- tests/demo-real-provider.test.ts
+- tests/mock-scan-provider.test.ts
+- tests/scan-queue.test.ts
+- tests/scanning-service.test.ts
+- tests/tenant-settings.test.ts
+
+Database migrations:
+- drizzle/0008_quiet_callisto.sql
+
+Commands run:
+- `npm run db:generate` — PASS, generated feature budget tables and scan mode migration.
+- `npm run lint` — PASS after removing an unused scan mode selector prop.
+- `npm run typecheck` — PASS on rerun after the first parallel run collided with Next.js build-generated `.next` types.
+- `npm run test` — PASS, 31 files and 132 tests passed.
+- `npm run build` — PASS.
+- `npm run db:migrate` — PASS.
+- Initial parallel `npm run db:seed:demo` — FAIL because it raced the migration while `scan_mode` was being added.
+- Rerun `npm run db:seed:demo` — PASS, demo tenant and seeded submissions created.
+- `npm run worker` — PASS, reported no queued scan jobs.
+- `npm run start -- -p 3100` — PASS, app served for smoke tests.
+- Authenticated curl smoke for `/api/health`, `/dashboard`, `/scan/new`, `/submissions`, `/reports`, `/reviewer/queue`, `/admin/settings`, `/submissions/b5ca3379-cbe0-4ce3-96f8-a07b2e37417f`, and `/submissions/ebea6c61-1ef5-45b9-9658-3221178a7ad1/report` — PASS.
+
+Manual verification:
+- Verified feature budgets and env defaults are validated and documented.
+- Verified new tables exist for tenant-aware feature quota limits, usage events, and rollups.
+- Verified scan queue stores `scan_mode` and scan start accepts Standard Check, Deep Check, and Local Fallback Check.
+- Verified the budget service estimates standard/deep/fallback usage, reserves, consumes, refunds, records fallback usage, blocks only when all relevant feature budgets are exhausted, and records budget audit events.
+- Verified demo-real provider calls route through budget checks for Web Source Matching, AI Writing Analysis, Academic Source Lookup, and Grammar Review.
+- Verified Grammar Review enforces both per-minute character capacity and max requests per minute.
+- Verified exhausted feature budgets fall back locally when allowed and mark fallback metadata instead of failing the entire scan.
+- Verified PDF export reserves and consumes PDF Report budget.
+- Verified `/scan/new` and a ready `/submissions/[id]` show scan-cost previews.
+- Verified `/dashboard` shows feature budget cards with remaining capacity and no visible Tavily, Gemini, OpenAlex, LanguageTool, API, token, or provider terms.
+- Verified `/admin/settings` exposes safe tenant feature budget controls for authorized admins.
+- Verified seeded report page shows fallback state without exposing vendor names in user-facing provider metadata.
+
+Remaining issues:
+- None for the demo feature budget/rate-limit overlay.
+
+Human intervention required:
+- None for local demo credit protection. Production billing policy, paid provider contract limits, legal approval, and production deployment credentials remain human-owned gates.
+
+---
+
+### Demo overlay enhancement: scan lifecycle auto-refresh
+
+Status: VERIFIED
+
+Verification date: 2026-04-28 12:03:27 IST
+
+Issue:
+- The scan lifecycle UI showed `READY_FOR_SCAN`, `SCAN_QUEUED`, `SCANNING`, and `SCAN_COMPLETE`, but it only updated after a user action or manual page refresh.
+
+Changed files:
+- AGENTS.md
+- IMPLEMENTATION_TRACKER.md
+- src/app/(dashboard)/submissions/[id]/page.tsx
+- src/components/submissions/scan-status-panel.tsx
+- src/components/submissions/submission-status-auto-refresh.tsx
+- tests/scan-status-panel.test.ts
+
+Database migrations:
+- None
+
+Commands run:
+- `npm run lint` — PASS
+- `npm run typecheck` — PASS
+- `npm run test -- tests/scan-status-panel.test.ts` — PASS, 1 file and 5 tests passed
+- `npm run build` — PASS
+- `npm run test` — PASS, 31 files and 133 tests passed
+
+Manual verification:
+- Confirmed the previous implementation had no polling, WebSocket, or Server-Sent Events for scan lifecycle status.
+- Added a client-side poller on `/submissions/[id]` that calls the existing tenant-scoped `/api/submissions/[id]` endpoint every 2.5 seconds while status is `SCAN_QUEUED` or `SCANNING`.
+- The poller calls `router.refresh()` when status or `updatedAt` changes, so the server-rendered lifecycle panel, status badge, scan summary, report link, and related page data update without manual browser refresh.
+- Polling stops automatically after terminal states such as `SCAN_COMPLETE` or `FAILED`.
+
+Remaining issues:
+- None for automatic lifecycle status updates.
+
+Human intervention required:
+- None.

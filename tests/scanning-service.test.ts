@@ -45,6 +45,7 @@ const scanJob = {
   finishedAt: null,
   id: "00000000-0000-4000-8000-000000000031",
   provider: "mock",
+  scanMode: "standard",
   startedAt: null,
   status: "QUEUED",
   submissionId: "00000000-0000-4000-8000-000000000041",
@@ -83,7 +84,7 @@ describe("scan service helpers", () => {
 
   it("builds provider input from the latest preprocessing payload", () => {
     expect(
-      scanningService.buildScanProviderInput(scanJob, {
+      scanningService.buildScanProviderInput(scanJob, scanJob.scanMode, {
         id: "00000000-0000-4000-8000-000000000051",
         originalWordCount: 12,
         sanitizedText: "Academic integrity text",
@@ -91,6 +92,7 @@ describe("scan service helpers", () => {
       })
     ).toEqual({
       originalWordCount: 12,
+      scanMode: "standard",
       scannedWordCount: 3,
       submissionId: scanJob.submissionId,
       tenantId: scanJob.tenantId,
@@ -136,7 +138,10 @@ describe("scan API route", () => {
 
     expect(scanningService.startSubmissionScan).toHaveBeenCalledWith(
       user,
-      scanJob.submissionId
+      scanJob.submissionId,
+      {
+        scanMode: undefined
+      }
     );
     expect(response.status).toBe(200);
     await expect(response.json()).resolves.toEqual({

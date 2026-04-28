@@ -47,6 +47,7 @@ export type EditableTenantSettings = {
 
 type TenantSettingsServiceOptions = {
   database?: Database;
+  tenantId?: string;
 };
 
 const optionalHttpUrlSchema = z.preprocess(
@@ -236,7 +237,7 @@ export async function getEditableTenantSettings(
   user: RbacUser,
   options: TenantSettingsServiceOptions = {}
 ): Promise<EditableTenantSettings | null> {
-  const tenantId = getEditableTenantSettingsTenantId(user);
+  const tenantId = getEditableTenantSettingsTenantId(user, options.tenantId);
 
   if (!tenantId) {
     return null;
@@ -261,7 +262,7 @@ export async function updateTenantSettings(
   input: TenantSettingsInput,
   options: TenantSettingsServiceOptions = {}
 ): Promise<EditableTenantSettings> {
-  const tenantId = assertCanEditTenantSettings(user);
+  const tenantId = assertCanEditTenantSettings(user, options.tenantId);
   const db = options.database ?? getDatabase();
   const settingsJson = buildTenantSettingsJson(input);
 
@@ -317,16 +318,30 @@ export async function updateTenantSettings(
   });
 }
 
-export function assertCanEditTenantSettings(user: RbacUser): string {
+export function assertCanEditTenantSettings(
+  user: RbacUser,
+  requestedTenantId?: string
+): string {
   if (user.role === "INSTITUTION_ADMIN" && user.tenantId) {
     return user.tenantId;
+  }
+
+  if (user.role === "SUPER_ADMIN" && requestedTenantId) {
+    return requestedTenantId;
   }
 
   throw new AuthorizationError("Tenant settings access denied");
 }
 
-function getEditableTenantSettingsTenantId(user: RbacUser): string | null {
-  return user.role === "INSTITUTION_ADMIN" && user.tenantId ? user.tenantId : null;
+function getEditableTenantSettingsTenantId(
+  user: RbacUser,
+  requestedTenantId?: string
+): string | null {
+  if (user.role === "INSTITUTION_ADMIN" && user.tenantId) {
+    return user.tenantId;
+  }
+
+  return user.role === "SUPER_ADMIN" ? requestedTenantId ?? null : null;
 }
 
 async function getTenantSettingsByTenantId(

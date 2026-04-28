@@ -1,5 +1,9 @@
 import { and, count, eq, gte, sql, type SQL } from "drizzle-orm";
 import { z } from "zod";
+import {
+  getTenantFeatureBudgets,
+  type FeatureBudgetCard
+} from "../budgets/feature-budget.service";
 import { getDatabase, schema, type Database } from "../../lib/db";
 import { AuthorizationError, type RbacUser } from "../../lib/rbac/guards";
 import { USER_ROLES, type UserRole } from "../../lib/rbac/roles";
@@ -17,6 +21,7 @@ export type AnalyticsScope = {
 
 export type AdminAnalytics = {
   generatedAt: string;
+  featureBudgets: FeatureBudgetCard[];
   highAiProbabilityCount: number;
   highSimilarityCount: number;
   monthStart: string;
@@ -88,7 +93,8 @@ export async function getAdminAnalytics(
     highSimilarityCount,
     highAiProbabilityCount,
     usersByRole,
-    usageLimits
+    usageLimits,
+    featureBudgets
   ] = await Promise.all([
     countRows(db, schema.submissions, submissionConditions),
     getSubmissionsByStatus(db, submissionConditions),
@@ -103,10 +109,15 @@ export async function getAdminAnalytics(
       sql`${schema.scanResults.aiProbability} >= ${HIGH_AI_PROBABILITY_THRESHOLD}`
     ]),
     getUsersByRole(db, scope),
-    getUsageLimits(db, scope)
+    getUsageLimits(db, scope),
+    getTenantFeatureBudgets(scope.tenantId, {
+      database: db,
+      now
+    })
   ]);
 
   return {
+    featureBudgets,
     generatedAt: now.toISOString(),
     highAiProbabilityCount,
     highSimilarityCount,

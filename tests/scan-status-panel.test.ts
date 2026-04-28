@@ -6,6 +6,7 @@ import {
   getScanStatusLabel,
   shouldShowScanAction
 } from "../src/components/submissions/scan-status-panel";
+import { shouldPollSubmissionStatus } from "../src/components/submissions/submission-status-auto-refresh";
 
 describe("scan status panel helpers", () => {
   it("shows the scan action only for preprocessed ready submissions", () => {
@@ -48,5 +49,13 @@ describe("scan status panel helpers", () => {
     expect(getScanStatusLabel("SCAN_COMPLETE")).toBe("Scan complete");
     expect(formatScoreAsPercent(42.4)).toBe("42%");
     expect(formatProbabilityAsPercent(0.876)).toBe("88%");
+  });
+
+  it("polls only while scan status can change in the background", () => {
+    expect(shouldPollSubmissionStatus("SCAN_QUEUED")).toBe(true);
+    expect(shouldPollSubmissionStatus("SCANNING")).toBe(true);
+    expect(shouldPollSubmissionStatus("READY_FOR_SCAN")).toBe(false);
+    expect(shouldPollSubmissionStatus("SCAN_COMPLETE")).toBe(false);
+    expect(shouldPollSubmissionStatus("FAILED")).toBe(false);
   });
 });

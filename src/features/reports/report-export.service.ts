@@ -1,4 +1,9 @@
 import { and, desc, eq } from "drizzle-orm";
+import {
+  FeatureBudgetExhaustedError,
+  consumeFeatureUsage,
+  reserveFeatureUsage
+} from "../budgets/feature-budget.service";
 import { getDatabase, schema, type Database } from "../../lib/db";
 import type { RbacUser } from "../../lib/rbac/guards";
 import {
@@ -48,6 +53,26 @@ export async function generateSubmissionReportPdf(
 
   if (!report) {
     throw new ReportPdfNotFoundError();
+  }
+
+  const reservation = await reserveFeatureUsage(
+    {
+      featureKey: "PDF_REPORT",
+      metadata: {
+        submissionId
+      },
+      submissionId,
+      tenantId: report.tenant.id,
+      units: 1,
+      userId: user.id
+    },
+    {
+      database: db
+    }
+  );
+
+  if (!reservation.allowed) {
+    throw new FeatureBudgetExhaustedError(reservation.message);
   }
 
   const snapshotVersion = await getNextSnapshotVersion(db, report);
@@ -107,6 +132,19 @@ export async function generateSubmissionReportPdf(
     },
     tenantId: report.tenant.id
   });
+
+  await consumeFeatureUsage(
+    {
+      metadata: {
+        pdfStorageKey,
+        snapshotId: snapshot.id
+      },
+      reservationId: reservation.reservationId
+    },
+    {
+      database: db
+    }
+  );
 
   return {
     filename,

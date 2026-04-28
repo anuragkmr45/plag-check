@@ -14,13 +14,17 @@ export const scanJobStatuses = [
 
 export type ScanJobStatus = (typeof scanJobStatuses)[number];
 
-export type ScanJob = Omit<typeof schema.scanJobs.$inferSelect, "status"> & {
+export type ScanMode = "standard" | "deep" | "fallback";
+
+export type ScanJob = Omit<typeof schema.scanJobs.$inferSelect, "scanMode" | "status"> & {
+  scanMode: ScanMode;
   status: ScanJobStatus;
 };
 
 export type EnqueueScanJobOptions = {
   database?: Database;
   provider?: string;
+  scanMode?: ScanMode;
   tenantId?: string;
 };
 
@@ -41,6 +45,7 @@ type ScanJobRow = {
   finished_at: Date | null;
   id: string;
   provider: string;
+  scan_mode: string;
   started_at: Date | null;
   status: string;
   submission_id: string;
@@ -54,6 +59,7 @@ const scanJobSelect = {
   finishedAt: schema.scanJobs.finishedAt,
   id: schema.scanJobs.id,
   provider: schema.scanJobs.provider,
+  scanMode: schema.scanJobs.scanMode,
   startedAt: schema.scanJobs.startedAt,
   status: schema.scanJobs.status,
   submissionId: schema.scanJobs.submissionId,
@@ -89,6 +95,7 @@ export async function enqueueScanJob(
     .values({
       attempts: 0,
       provider: options.provider ?? DEFAULT_SCAN_JOB_PROVIDER,
+      scanMode: options.scanMode ?? "standard",
       status: "QUEUED",
       submissionId: submission.id,
       tenantId: submission.tenantId
@@ -131,6 +138,7 @@ export async function claimNextScanJob(
           tenant_id,
           submission_id,
           provider,
+          scan_mode,
           status,
           attempts,
           error_message,
@@ -275,6 +283,7 @@ function normalizeMaxAttempts(
 function mapScanJob(row: typeof schema.scanJobs.$inferSelect): ScanJob {
   return {
     ...row,
+    scanMode: parseScanMode(row.scanMode),
     status: parseScanJobStatus(row.status)
   };
 }
@@ -287,11 +296,20 @@ function mapScanJobRow(row: ScanJobRow): ScanJob {
     finishedAt: row.finished_at,
     id: row.id,
     provider: row.provider,
+    scanMode: parseScanMode(row.scan_mode),
     startedAt: row.started_at,
     status: parseScanJobStatus(row.status),
     submissionId: row.submission_id,
     tenantId: row.tenant_id
   };
+}
+
+export function parseScanMode(value: string): ScanMode {
+  if (value === "standard" || value === "deep" || value === "fallback") {
+    return value;
+  }
+
+  return "standard";
 }
 
 function parseScanJobStatus(status: string): ScanJobStatus {

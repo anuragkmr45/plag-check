@@ -211,10 +211,13 @@ export default async function SubmissionDetailPage({
           </section>
 
           <ScanStatusPanel
+            charCount={preprocessingSummary?.sanitizedTextLength ?? 0}
             hasPreprocessing={Boolean(preprocessingSummary)}
             scanSummary={scanSummary}
             status={detail.submission.status}
+            statusUpdatedAt={detail.submission.updatedAt}
             submissionId={detail.submission.id}
+            wordCount={preprocessingSummary?.sanitizedWordCount ?? 0}
           />
         </div>
 

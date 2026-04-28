@@ -1,5 +1,6 @@
 export type ScanProviderInput = {
   originalWordCount: number;
+  scanMode: "deep" | "fallback" | "standard";
   scannedWordCount: number;
   submissionId: string;
   tenantId: string;

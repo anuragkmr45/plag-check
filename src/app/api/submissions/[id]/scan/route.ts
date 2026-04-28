@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
+import { FeatureBudgetExhaustedError } from "../../../../../features/budgets/feature-budget.service";
 import { AuthorizationError } from "../../../../../lib/rbac/guards";
 import { csrfErrorResponse, jsonError } from "../../../../../lib/security/api-responses";
 import { verifySameOriginRequest } from "../../../../../lib/security/csrf";
@@ -15,6 +16,11 @@ import {
 export const dynamic = "force-dynamic";
 
 const submissionIdSchema = z.string().uuid();
+const scanRequestSchema = z
+  .object({
+    scanMode: z.enum(["standard", "deep", "fallback"]).optional()
+  })
+  .optional();
 
 export async function POST(
   request: Request,
@@ -43,8 +49,17 @@ export async function POST(
     return jsonError({ message: "Not found", status: 404 });
   }
 
+  const body = (await request.json().catch(() => undefined)) as unknown;
+  const parsedBody = scanRequestSchema.safeParse(body);
+
+  if (!parsedBody.success) {
+    return jsonError({ message: "Invalid scan request", status: 400 });
+  }
+
   const scan = await handleScanError(() =>
-    startSubmissionScan(session.user, parsedId.data)
+    startSubmissionScan(session.user, parsedId.data, {
+      scanMode: parsedBody.data?.scanMode
+    })
   );
 
   if (scan instanceof NextResponse) {
@@ -79,7 +94,8 @@ async function handleScanError<T>(
     if (
       error instanceof SubmissionScanStateError ||
       error instanceof SubmissionScanPreprocessingMissingError ||
-      error instanceof ActiveScanJobExistsError
+      error instanceof ActiveScanJobExistsError ||
+      error instanceof FeatureBudgetExhaustedError
     ) {
       return jsonError({ message: error.message, status: 409 });
     }

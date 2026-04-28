@@ -3,6 +3,7 @@ import { createDemoRealScanProvider } from "../src/features/scanning/providers";
 
 const scanInput = {
   originalWordCount: 45,
+  scanMode: "standard",
   scannedWordCount: 42,
   submissionId: "00000000-0000-4000-8000-000000000401",
   tenantId: "00000000-0000-4000-8000-000000000402",
@@ -11,7 +12,7 @@ const scanInput = {
     "Plagiarism detection compares submitted writing with source material.",
     "In conclusion, it is important to note that the student will recieve feedback after teh draft."
   ].join(" ")
-};
+} as const;
 
 const fallbackConfig = {
   allowFallback: true,
@@ -110,6 +111,7 @@ describe("demo-real scan provider", () => {
       });
       const result = await provider.scan({
         ...scanInput,
+        scanMode: "standard",
         text: `${"Long copied sentence with academic integrity wording ".repeat(30)}.`
       });
 

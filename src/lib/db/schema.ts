@@ -445,6 +445,7 @@ export const scanJobs = pgTable(
       .notNull()
       .references(() => submissions.id, { onDelete: "cascade" }),
     provider: text("provider").notNull(),
+    scanMode: text("scan_mode").notNull().default("standard"),
     status: text("status").notNull(),
     attempts: integer("attempts").notNull().default(0),
     errorMessage: text("error_message"),
@@ -458,6 +459,7 @@ export const scanJobs = pgTable(
     index("scan_jobs_tenant_id_idx").on(table.tenantId),
     index("scan_jobs_submission_id_idx").on(table.submissionId),
     index("scan_jobs_status_idx").on(table.status),
+    index("scan_jobs_scan_mode_idx").on(table.scanMode),
     index("scan_jobs_tenant_submission_idx").on(
       table.tenantId,
       table.submissionId
@@ -467,7 +469,162 @@ export const scanJobs = pgTable(
       table.status,
       table.createdAt
     ),
-    check("scan_jobs_attempts_nonnegative", sql`${table.attempts} >= 0`)
+    check("scan_jobs_attempts_nonnegative", sql`${table.attempts} >= 0`),
+    check(
+      "scan_jobs_scan_mode_allowed",
+      sql`${table.scanMode} IN ('standard', 'deep', 'fallback')`
+    )
+  ]
+);
+
+export const featureQuotaLimits = pgTable(
+  "feature_quota_limits",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    tenantId: uuid("tenant_id")
+      .notNull()
+      .references(() => tenants.id, { onDelete: "cascade" }),
+    featureKey: text("feature_key").notNull(),
+    featureLabel: text("feature_label").notNull(),
+    unitType: text("unit_type").notNull(),
+    period: text("period").notNull(),
+    limitUnits: integer("limit_units").notNull(),
+    metadata: jsonb("metadata").notNull().default(sql`'{}'::jsonb`),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .default(sql`now()`),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .notNull()
+      .default(sql`now()`)
+  },
+  (table) => [
+    index("feature_quota_limits_tenant_id_idx").on(table.tenantId),
+    index("feature_quota_limits_feature_key_idx").on(table.featureKey),
+    uniqueIndex("feature_quota_limits_tenant_feature_period_unique").on(
+      table.tenantId,
+      table.featureKey,
+      table.period
+    ),
+    check("feature_quota_limits_limit_units_positive", sql`${table.limitUnits} > 0`),
+    check(
+      "feature_quota_limits_period_allowed",
+      sql`${table.period} IN ('minute', 'day', 'month')`
+    )
+  ]
+);
+
+export const featureUsageEvents = pgTable(
+  "feature_usage_events",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    tenantId: uuid("tenant_id")
+      .notNull()
+      .references(() => tenants.id, { onDelete: "cascade" }),
+    userId: uuid("user_id").references(() => users.id, {
+      onDelete: "set null"
+    }),
+    submissionId: uuid("submission_id").references(() => submissions.id, {
+      onDelete: "set null"
+    }),
+    featureKey: text("feature_key").notNull(),
+    featureLabel: text("feature_label").notNull(),
+    unitsReserved: integer("units_reserved").notNull().default(0),
+    unitsConsumed: integer("units_consumed").notNull().default(0),
+    unitType: text("unit_type").notNull(),
+    status: text("status").notNull(),
+    period: text("period").notNull(),
+    resetAt: timestamp("reset_at", { withTimezone: true }).notNull(),
+    metadata: jsonb("metadata").notNull().default(sql`'{}'::jsonb`),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .default(sql`now()`)
+  },
+  (table) => [
+    index("feature_usage_events_tenant_id_idx").on(table.tenantId),
+    index("feature_usage_events_user_id_idx").on(table.userId),
+    index("feature_usage_events_submission_id_idx").on(table.submissionId),
+    index("feature_usage_events_feature_period_idx").on(
+      table.featureKey,
+      table.period,
+      table.createdAt
+    ),
+    index("feature_usage_events_tenant_feature_period_idx").on(
+      table.tenantId,
+      table.featureKey,
+      table.period,
+      table.createdAt
+    ),
+    index("feature_usage_events_status_idx").on(table.status),
+    check(
+      "feature_usage_events_units_reserved_nonnegative",
+      sql`${table.unitsReserved} >= 0`
+    ),
+    check(
+      "feature_usage_events_units_consumed_nonnegative",
+      sql`${table.unitsConsumed} >= 0`
+    ),
+    check(
+      "feature_usage_events_period_allowed",
+      sql`${table.period} IN ('minute', 'day', 'month')`
+    ),
+    check(
+      "feature_usage_events_status_allowed",
+      sql`${table.status} IN ('estimated', 'reserved', 'consumed', 'refunded', 'fallback', 'blocked')`
+    )
+  ]
+);
+
+export const featureUsageRollups = pgTable(
+  "feature_usage_rollups",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    tenantId: uuid("tenant_id")
+      .notNull()
+      .references(() => tenants.id, { onDelete: "cascade" }),
+    featureKey: text("feature_key").notNull(),
+    featureLabel: text("feature_label").notNull(),
+    unitType: text("unit_type").notNull(),
+    period: text("period").notNull(),
+    periodStart: timestamp("period_start", { withTimezone: true }).notNull(),
+    resetAt: timestamp("reset_at", { withTimezone: true }).notNull(),
+    reservedUnits: integer("reserved_units").notNull().default(0),
+    consumedUnits: integer("consumed_units").notNull().default(0),
+    fallbackUnits: integer("fallback_units").notNull().default(0),
+    blockedUnits: integer("blocked_units").notNull().default(0),
+    metadata: jsonb("metadata").notNull().default(sql`'{}'::jsonb`),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .notNull()
+      .default(sql`now()`)
+  },
+  (table) => [
+    index("feature_usage_rollups_tenant_id_idx").on(table.tenantId),
+    index("feature_usage_rollups_feature_key_idx").on(table.featureKey),
+    uniqueIndex("feature_usage_rollups_tenant_feature_period_start_unique").on(
+      table.tenantId,
+      table.featureKey,
+      table.period,
+      table.periodStart
+    ),
+    check(
+      "feature_usage_rollups_period_allowed",
+      sql`${table.period} IN ('minute', 'day', 'month')`
+    ),
+    check(
+      "feature_usage_rollups_reserved_units_nonnegative",
+      sql`${table.reservedUnits} >= 0`
+    ),
+    check(
+      "feature_usage_rollups_consumed_units_nonnegative",
+      sql`${table.consumedUnits} >= 0`
+    ),
+    check(
+      "feature_usage_rollups_fallback_units_nonnegative",
+      sql`${table.fallbackUnits} >= 0`
+    ),
+    check(
+      "feature_usage_rollups_blocked_units_nonnegative",
+      sql`${table.blockedUnits} >= 0`
+    )
   ]
 );
 

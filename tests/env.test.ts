@@ -37,6 +37,9 @@ describe("parseEnv", () => {
     expect(parsed.SCAN_PROVIDER).toBe("mock");
     expect(parsed.ALLOW_FALLBACK).toBe(true);
     expect(parsed.DEMO_WEB_SEARCH_PROVIDER).toBe("fallback");
+    expect(parsed.FEATURE_BUDGETS_ENABLED).toBe(true);
+    expect(parsed.MONTHLY_FULL_CHECK_LIMIT).toBe(300);
+    expect(parsed.WEB_SOURCE_MATCHING_MONTHLY_UNITS).toBe(900);
   });
 
   it("parses demo-real provider settings from environment input", () => {

@@ -1,5 +1,12 @@
 import { and, count, desc, eq, inArray, sql, type SQL } from "drizzle-orm";
 import {
+  assertCanRunScan,
+  consumeReservedFeatureUsageForSubmission,
+  normalizeScanMode,
+  recordFallbackUsage,
+  reserveFeatureUsage
+} from "../../features/budgets/feature-budget.service";
+import {
   demoRealScanProvider,
   mockScanProvider,
   type ScanProvider,
@@ -12,8 +19,10 @@ import {
   enqueueScanJob,
   getScanJobErrorMessage,
   isScanJobStatus,
+  parseScanMode,
   type ScanJob,
-  type ScanJobStatus
+  type ScanJobStatus,
+  type ScanMode
 } from "../../lib/jobs/scan-queue";
 import type { RbacUser } from "../../lib/rbac/guards";
 import {
@@ -29,6 +38,10 @@ export type StartSubmissionScanResult = {
     id: string;
     status: SubmissionStatus;
   };
+};
+
+export type StartSubmissionScanOptions = ScanningServiceOptions & {
+  scanMode?: ScanMode;
 };
 
 export type ScanProcessingResult = {
@@ -47,6 +60,7 @@ export type SubmissionScanSummary = {
     finishedAt: Date | null;
     id: string;
     provider: string;
+    scanMode: ScanMode;
     startedAt: Date | null;
     status: ScanJobStatus;
   } | null;
@@ -139,10 +153,12 @@ export function isActiveScanJobStatus(
 
 export function buildScanProviderInput(
   job: Pick<ScanJob, "submissionId" | "tenantId">,
+  scanMode: ScanMode,
   preprocessing: PreprocessingForScan
 ): ScanProviderInput {
   return {
     originalWordCount: preprocessing.originalWordCount,
+    scanMode,
     scannedWordCount: preprocessing.sanitizedWordCount,
     submissionId: job.submissionId,
     tenantId: job.tenantId,
@@ -161,9 +177,10 @@ export function resolveScanProvider(providerId: string): ScanProvider {
 export async function startSubmissionScan(
   user: RbacUser,
   submissionId: string,
-  options: ScanningServiceOptions = {}
+  options: StartSubmissionScanOptions = {}
 ): Promise<StartSubmissionScanResult> {
   const db = options.database ?? getDatabase();
+  const scanMode = normalizeScanMode(options.scanMode);
   const submission = await getSubmissionById(user, submissionId, {
     database: db
   });
@@ -181,6 +198,20 @@ export async function startSubmissionScan(
   if (!preprocessing) {
     throw new SubmissionScanPreprocessingMissingError();
   }
+
+  const estimate = await assertCanRunScan(
+    {
+      charCount: preprocessing.sanitizedText.length,
+      scanMode,
+      submissionId: submission.id,
+      tenantId: submission.tenantId,
+      userId: user.id,
+      wordCount: preprocessing.sanitizedWordCount
+    },
+    {
+      database: db
+    }
+  );
 
   return db.transaction(async (tx) => {
     const activeJob = await getActiveScanJob(tx, submission);
@@ -214,8 +245,51 @@ export async function startSubmissionScan(
     const scanJob = await enqueueScanJob(submission.id, {
       database: tx,
       provider: getConfiguredScanProviderId(),
+      scanMode,
       tenantId: submission.tenantId
     });
+
+    if (scanMode === "fallback") {
+      await recordFallbackUsage(
+        {
+          featureKey: "FALLBACK_SCAN",
+          metadata: {
+            reason: "local_fallback_scan_mode",
+            scanMode
+          },
+          submissionId: submission.id,
+          tenantId: submission.tenantId,
+          units: 1,
+          userId: user.id
+        },
+        {
+          database: tx
+        }
+      );
+    }
+
+    for (const featureKey of ["FULL_CHECK", "MONTHLY_WORDS"] as const) {
+      const item = estimate.items.find((entry) => entry.featureKey === featureKey);
+
+      if (item) {
+        await reserveFeatureUsage(
+          {
+            featureKey,
+            metadata: {
+              scanMode,
+              scanProvider: getConfiguredScanProviderId()
+            },
+            submissionId: submission.id,
+            tenantId: submission.tenantId,
+            units: item.units,
+            userId: user.id
+          },
+          {
+            database: tx
+          }
+        );
+      }
+    }
 
     await tx.insert(schema.auditEvents).values({
       action: "submission.scan.queued",
@@ -224,6 +298,7 @@ export async function startSubmissionScan(
       entityType: "scan_job",
       metadata: {
         preprocessingRunId: preprocessing.id,
+        scanMode,
         submissionId: submission.id
       },
       tenantId: submission.tenantId
@@ -271,10 +346,27 @@ async function processScanJobWithProvider(
   await markSubmissionScanning(db, job, preprocessing.id);
 
   const providerResult = await provider.scan(
-    buildScanProviderInput(job, preprocessing)
+    buildScanProviderInput(job, job.scanMode, preprocessing)
   );
 
-  return storeScanProviderResult(db, job, preprocessing, providerResult);
+  const result = await storeScanProviderResult(db, job, preprocessing, providerResult);
+
+  await consumeReservedFeatureUsageForSubmission(
+    {
+      featureKeys: ["FULL_CHECK", "MONTHLY_WORDS"],
+      metadata: {
+        scanMode: job.scanMode,
+        scanResultId: result.scanResultId
+      },
+      submissionId: job.submissionId,
+      tenantId: job.tenantId
+    },
+    {
+      database: db
+    }
+  );
+
+  return result;
 }
 
 export async function handleScanJobProcessingFailure(
@@ -343,6 +435,7 @@ export async function getScanSummaryForSubmission(
       finishedAt: schema.scanJobs.finishedAt,
       id: schema.scanJobs.id,
       provider: schema.scanJobs.provider,
+      scanMode: schema.scanJobs.scanMode,
       startedAt: schema.scanJobs.startedAt,
       status: schema.scanJobs.status
     })
@@ -383,6 +476,7 @@ export async function getScanSummaryForSubmission(
     latestJob: latestJob
       ? {
           ...latestJob,
+          scanMode: parseScanMode(latestJob.scanMode),
           status: parseStoredScanJobStatus(latestJob.status)
         }
       : null,

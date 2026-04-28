@@ -17,6 +17,13 @@ const institutionAdmin = {
   tenantId
 } satisfies RbacUser;
 
+const superAdmin = {
+  id: "00000000-0000-4000-8000-000000000012",
+  isActive: true,
+  role: "SUPER_ADMIN",
+  tenantId: null
+} satisfies RbacUser;
+
 describe("tenant settings", () => {
   it("normalizes empty settings to safe defaults", () => {
     expect(normalizeTenantSettings(null)).toEqual(DEFAULT_TENANT_SETTINGS);
@@ -123,18 +130,15 @@ describe("tenant settings", () => {
 
   it("allows only institution admins to edit their tenant settings", () => {
     expect(assertCanEditTenantSettings(institutionAdmin)).toBe(tenantId);
+    expect(assertCanEditTenantSettings(superAdmin, tenantId)).toBe(tenantId);
     expect(() =>
       assertCanEditTenantSettings({
         ...institutionAdmin,
         role: "REVIEWER"
       })
     ).toThrow(AuthorizationError);
-    expect(() =>
-      assertCanEditTenantSettings({
-        ...institutionAdmin,
-        role: "SUPER_ADMIN",
-        tenantId: null
-      })
-    ).toThrow(AuthorizationError);
+    expect(() => assertCanEditTenantSettings(superAdmin)).toThrow(
+      AuthorizationError
+    );
   });
 });

@@ -1,4 +1,15 @@
 import { z } from "zod";
+import {
+  capTextToAiInputBudget,
+  consumeFeatureUsage,
+  estimateScanUsage,
+  getGrammarCharacterLimitForScanMode,
+  readFeatureBudgetConfig,
+  recordFallbackUsage,
+  reserveFeatureUsage,
+  type FeatureBudgetConfig,
+  type FeatureKey
+} from "../../budgets/feature-budget.service";
 import { env } from "../../../lib/env";
 import type {
   ScanAiAssessment,
@@ -11,6 +22,7 @@ import type {
 
 type DemoRealScanProviderConfig = {
   allowFallback: boolean;
+  budgetEnforcement?: boolean;
   demoAcademicProvider: "openalex" | "fallback" | "disabled";
   demoAiDetectionMode: "llm" | "heuristic";
   demoAiProvider: "gemini" | "heuristic" | "disabled";
@@ -29,6 +41,7 @@ type DemoRealScanProviderConfig = {
   tavilyMaxChunks: number;
   tavilyMaxResults: number;
   tavilySearchDepth: "basic" | "advanced";
+  featureBudgetConfig?: FeatureBudgetConfig;
 };
 
 type TextChunk = {
@@ -258,10 +271,10 @@ export function createDemoRealScanProvider(
     async scan(input: ScanProviderInput): Promise<ScanProviderResult> {
       const chunks = buildTextChunks(input.text, config.tavilyMaxChunks);
       const [web, ai, academic, grammar] = await Promise.all([
-        scanWebSources(input.text, chunks, config),
-        scanAiLikelihood(input.text, config),
-        scanAcademicMetadata(chunks, config),
-        scanGrammar(input.text, config)
+        scanWebSources(input, chunks, config),
+        scanAiLikelihood(input, config),
+        scanAcademicMetadata(input, chunks, config),
+        scanGrammar(input, config)
       ]);
       const similarityScore = calculateSimilarityScore(
         web.matches,
@@ -306,6 +319,7 @@ export function createDemoRealScanProvider(
 export function readDemoRealConfig(): DemoRealScanProviderConfig {
   return {
     allowFallback: env.ALLOW_FALLBACK,
+    budgetEnforcement: env.FEATURE_BUDGETS_ENABLED,
     demoAcademicProvider: env.DEMO_ACADEMIC_PROVIDER,
     demoAiDetectionMode: env.DEMO_AI_DETECTION_MODE,
     demoAiProvider: env.DEMO_AI_PROVIDER,
@@ -323,21 +337,35 @@ export function readDemoRealConfig(): DemoRealScanProviderConfig {
     tavilyApiKey: normalizeOptionalSecret(env.TAVILY_API_KEY),
     tavilyMaxChunks: env.TAVILY_MAX_CHUNKS,
     tavilyMaxResults: env.TAVILY_MAX_RESULTS,
-    tavilySearchDepth: env.TAVILY_SEARCH_DEPTH
+    tavilySearchDepth: env.TAVILY_SEARCH_DEPTH,
+    featureBudgetConfig: readFeatureBudgetConfig()
   };
 }
 
 async function scanWebSources(
-  text: string,
+  input: ScanProviderInput,
   chunks: TextChunk[],
   config: DemoRealScanProviderConfig
 ): Promise<WebScanResult> {
+  const text = input.text;
+
   if (
+    input.scanMode === "fallback" ||
     config.demoWebSearchProvider !== "tavily" ||
     !config.tavilyApiKey ||
     chunks.length === 0
   ) {
-    return fallbackWebScan(text, "Tavily API key or provider setting is missing");
+    return fallbackWebScan(text, "Web Source Matching is using local fallback");
+  }
+
+  const reservation = await reserveProviderFeatureUsage(
+    input,
+    config,
+    "WEB_SOURCE_MATCHING"
+  );
+
+  if (!reservation.allowed) {
+    return fallbackWebScan(text, reservation.reason);
   }
 
   try {
@@ -388,6 +416,13 @@ async function scanWebSources(
       }
     }
 
+    await consumeFeatureUsage({
+      metadata: {
+        resultCount: matches.length
+      },
+      reservationId: reservation.reservationId
+    });
+
     return {
       matches: matches
         .sort((left, right) => right.similarityScore - left.similarityScore)
@@ -400,6 +435,12 @@ async function scanWebSources(
       }
     };
   } catch (error) {
+    await consumeFeatureUsage({
+      metadata: {
+        fallbackReason: getSafeErrorReason(error)
+      },
+      reservationId: reservation.reservationId
+    });
     return fallbackWebScan(text, getSafeErrorReason(error));
   }
 }
@@ -468,10 +509,13 @@ function buildProviderSearchQuery(text: string, maxLength: number): string {
 }
 
 async function scanAiLikelihood(
-  text: string,
+  input: ScanProviderInput,
   config: DemoRealScanProviderConfig
 ): Promise<AiScanResult> {
+  const text = input.text;
+
   if (
+    input.scanMode === "fallback" ||
     config.demoAiProvider !== "gemini" ||
     config.demoAiDetectionMode !== "llm" ||
     !config.geminiApiKey
@@ -486,7 +530,26 @@ async function scanAiLikelihood(
     };
   }
 
+  const reservation = await reserveProviderFeatureUsage(
+    input,
+    config,
+    "AI_WRITING_ANALYSIS"
+  );
+
+  if (!reservation.allowed) {
+    return {
+      ...heuristicAiScan(text),
+      status: {
+        fallback: true,
+        provider: "gemini",
+        reason: reservation.reason
+      }
+    };
+  }
+
   try {
+    const budgetConfig = config.featureBudgetConfig ?? readFeatureBudgetConfig();
+    const cappedText = capTextToAiInputBudget(text, budgetConfig);
     const response = await fetchJson(
       `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(
         config.geminiModel
@@ -497,14 +560,17 @@ async function scanAiLikelihood(
             {
               parts: [
                 {
-                  text: buildGeminiPrompt(text)
+                  text: buildGeminiPrompt(cappedText)
                 }
               ],
               role: "user"
             }
           ],
           generationConfig: {
-            maxOutputTokens: config.geminiMaxOutputTokens,
+            maxOutputTokens: Math.min(
+              config.geminiMaxOutputTokens,
+              budgetConfig.aiWritingAnalysisMaxOutputTokens
+            ),
             responseMimeType: "application/json",
             temperature: 0.1
           }
@@ -538,6 +604,18 @@ async function scanAiLikelihood(
         };
       });
 
+    await consumeFeatureUsage({
+      metadata: {
+        inputTokens: Math.ceil(cappedText.length / 4),
+        outputTokenLimit: Math.min(
+          config.geminiMaxOutputTokens,
+          budgetConfig.aiWritingAnalysisMaxOutputTokens
+        ),
+        resultCount: assessments.length
+      },
+      reservationId: reservation.reservationId
+    });
+
     return {
       assessments,
       confidenceBand: parsed.confidenceBand,
@@ -550,6 +628,12 @@ async function scanAiLikelihood(
       }
     };
   } catch (error) {
+    await consumeFeatureUsage({
+      metadata: {
+        fallbackReason: getSafeErrorReason(error)
+      },
+      reservationId: reservation.reservationId
+    });
     return {
       ...heuristicAiScan(text),
       status: {
@@ -634,10 +718,12 @@ function heuristicAiScan(
 }
 
 async function scanAcademicMetadata(
+  input: ScanProviderInput,
   chunks: TextChunk[],
   config: DemoRealScanProviderConfig
 ): Promise<AcademicScanResult> {
   if (
+    input.scanMode === "fallback" ||
     config.demoAcademicProvider !== "openalex" ||
     chunks.length === 0
   ) {
@@ -647,6 +733,23 @@ async function scanAcademicMetadata(
         fallback: true,
         provider: "openalex",
         reason: "OpenAlex provider setting is missing"
+      }
+    };
+  }
+
+  const reservation = await reserveProviderFeatureUsage(
+    input,
+    config,
+    "ACADEMIC_SOURCE_LOOKUP"
+  );
+
+  if (!reservation.allowed) {
+    return {
+      matches: [],
+      status: {
+        fallback: true,
+        provider: "openalex",
+        reason: reservation.reason
       }
     };
   }
@@ -711,6 +814,13 @@ async function scanAcademicMetadata(
       }
     }
 
+    await consumeFeatureUsage({
+      metadata: {
+        resultCount: matches.length
+      },
+      reservationId: reservation.reservationId
+    });
+
     return {
       matches: matches.slice(0, config.openAlexMaxResults),
       status: {
@@ -720,6 +830,12 @@ async function scanAcademicMetadata(
       }
     };
   } catch (error) {
+    await consumeFeatureUsage({
+      metadata: {
+        fallbackReason: getSafeErrorReason(error)
+      },
+      reservationId: reservation.reservationId
+    });
     return {
       matches: [],
       status: {
@@ -732,10 +848,15 @@ async function scanAcademicMetadata(
 }
 
 async function scanGrammar(
-  text: string,
+  input: ScanProviderInput,
   config: DemoRealScanProviderConfig
 ): Promise<GrammarScanResult> {
-  if (config.demoGrammarProvider !== "languagetool-public") {
+  const text = input.text;
+
+  if (
+    input.scanMode === "fallback" ||
+    config.demoGrammarProvider !== "languagetool-public"
+  ) {
     return {
       findings: fallbackGrammarScan(text),
       status: {
@@ -746,10 +867,36 @@ async function scanGrammar(
     };
   }
 
+  const reservation = await reserveProviderFeatureUsage(
+    input,
+    config,
+    "GRAMMAR_REVIEW"
+  );
+
+  if (!reservation.allowed) {
+    return {
+      findings: fallbackGrammarScan(text),
+      status: {
+        fallback: true,
+        provider: "languagetool-public",
+        reason: reservation.reason
+      }
+    };
+  }
+
   try {
+    const budgetConfig = config.featureBudgetConfig ?? readFeatureBudgetConfig();
+    const grammarBudgetChars = getGrammarCharacterLimitForScanMode(
+      input.scanMode,
+      budgetConfig
+    );
+    const grammarText = text.slice(
+      0,
+      Math.min(grammarBudgetChars, config.languageToolMaxChars)
+    );
     const body = new URLSearchParams({
       language: config.languageToolLanguage,
-      text: text.slice(0, config.languageToolMaxChars)
+      text: grammarText
     });
     const response = await fetchJson(config.languageToolUrl, {
       body,
@@ -759,6 +906,14 @@ async function scanGrammar(
       method: "POST"
     });
     const parsed = languageToolResponseSchema.parse(response);
+
+    await consumeFeatureUsage({
+      metadata: {
+        characterCount: grammarText.length,
+        resultCount: parsed.matches.length
+      },
+      reservationId: reservation.reservationId
+    });
 
     return {
       findings: parsed.matches.slice(0, 25).map((match) => ({
@@ -776,6 +931,12 @@ async function scanGrammar(
       }
     };
   } catch (error) {
+    await consumeFeatureUsage({
+      metadata: {
+        fallbackReason: getSafeErrorReason(error)
+      },
+      reservationId: reservation.reservationId
+    });
     return {
       findings: fallbackGrammarScan(text),
       status: {
@@ -1034,6 +1195,80 @@ function buildOpenAlexAbstractSnippet(
 
 function buildGrammarMessage(message: string, ruleId: string | undefined): string {
   return ruleId ? `${message} (${ruleId})` : message;
+}
+
+async function reserveProviderFeatureUsage(
+  input: ScanProviderInput,
+  config: DemoRealScanProviderConfig,
+  featureKey: FeatureKey
+): Promise<
+  | {
+      allowed: true;
+      reservationId: string | null;
+    }
+  | {
+      allowed: false;
+      reason: string;
+    }
+> {
+  if (!config.budgetEnforcement) {
+    return {
+      allowed: true,
+      reservationId: null
+    };
+  }
+
+  const budgetConfig = config.featureBudgetConfig ?? readFeatureBudgetConfig();
+  const estimate = estimateScanUsage(
+    {
+      charCount: input.text.length,
+      scanMode: input.scanMode,
+      wordCount: input.scannedWordCount
+    },
+    budgetConfig
+  );
+  const item = estimate.items.find((entry) => entry.featureKey === featureKey);
+
+  if (!item) {
+    return {
+      allowed: true,
+      reservationId: null
+    };
+  }
+
+  const reservation = await reserveFeatureUsage({
+    featureKey,
+    metadata: {
+      scanMode: input.scanMode,
+      submissionId: input.submissionId
+    },
+    submissionId: input.submissionId,
+    tenantId: input.tenantId,
+    units: item.units
+  });
+
+  if (reservation.allowed) {
+    return {
+      allowed: true,
+      reservationId: reservation.reservationId
+    };
+  }
+
+  await recordFallbackUsage({
+    featureKey,
+    metadata: {
+      reason: reservation.message,
+      scanMode: input.scanMode
+    },
+    submissionId: input.submissionId,
+    tenantId: input.tenantId,
+    units: 0
+  });
+
+  return {
+    allowed: false,
+    reason: reservation.message
+  };
 }
 
 async function fetchJson(

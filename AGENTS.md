@@ -254,6 +254,42 @@ The local demo report page and PDF export now include visual analysis summaries 
 
 This is a visualization and demo-report usability enhancement only. It does not change scan-provider behavior, certified provider scope, tenant isolation, RBAC policy, or production sign-off status.
 
+## 7C. Demo feature budgets and rate limits
+
+Status: VERIFIED on 2026-04-28 after local checks.
+
+The local demo build includes feature-wise usage budgets and rate limits for:
+
+- Full Checks.
+- Web Source Matching.
+- AI Writing Analysis.
+- Academic Source Lookup.
+- Grammar Review.
+- PDF Reports.
+- Fallback Scans.
+- Monthly Words Processed.
+
+Dashboard and user-facing budget UI must use these feature labels only. Do not show internal vendor/API names in budget cards. Provider metadata may still store internal names for debugging, but reports and dashboards should present feature-level live/fallback state.
+
+Default demo math:
+
+- 300 standard scans/month use 900 Web Source Matching units.
+- 100 Web Source Matching units remain as reserve from the 1,000-unit demo allowance.
+- 300 standard scans/month use 300 AI Writing Analysis requests.
+- AI input is capped at 8,000 tokens and output at 1,024 tokens.
+- 300 standard scans/month use up to 5,400,000 Grammar Review characters.
+- 300 standard scans/month use 600 Academic Source Lookup units.
+
+This is a local demo credit-protection layer. It is not production billing, procurement certification, or paid-provider contract enforcement.
+
+## 7D. Demo scan lifecycle auto-refresh
+
+Status: VERIFIED on 2026-04-28 12:03:27 IST.
+
+Submission detail pages now poll the tenant-scoped submission status endpoint while a scan is `SCAN_QUEUED` or `SCANNING`. The page refreshes its server-rendered data automatically when the status changes, so users can see lifecycle updates without manually refreshing the browser.
+
+This is a lightweight polling enhancement for the existing PostgreSQL-backed worker flow. It is not a WebSocket/SSE implementation and does not replace the requirement to run the worker process.
+
 ## 8. Canonical roles
 
 Use exactly these roles:
