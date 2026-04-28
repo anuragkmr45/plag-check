@@ -24,7 +24,7 @@ export function DashboardShell({
   return (
     <div className="pc-app-bg min-h-screen text-slate-950">
       <div className="flex min-h-screen">
-        <aside className="pc-sidebar hidden w-64 border-r border-teal-950/40 px-5 py-6 md:block">
+        <aside className="pc-sidebar sticky top-0 hidden h-screen w-64 overflow-y-auto border-r border-teal-950/40 px-5 py-6 md:block">
           <div className="rounded-lg border border-white/10 bg-white/8 p-3 shadow-sm">
             <div className="flex items-center gap-3">
               <TenantBrandMark

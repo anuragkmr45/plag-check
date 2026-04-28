@@ -15,7 +15,8 @@
     "db:seed": "tsx --env-file-if-exists=.env scripts/seed.ts",
     "db:seed:demo": "tsx --env-file-if-exists=.env scripts/seed-demo.ts",
     "db:studio": "drizzle-kit studio",
-    "worker": "tsx --env-file-if-exists=.env src/server/worker.ts"
+    "worker": "tsx --env-file-if-exists=.env src/server/worker.ts",
+    "worker:once": "tsx --env-file-if-exists=.env src/server/worker-once.ts"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.1037.0",

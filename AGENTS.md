@@ -215,7 +215,7 @@ Do not hallucinate. Do not invent external APIs. Do not hard-code secrets. Do no
 |---|---|
 | Overall status | MVP_VERIFIED |
 | Current phase | MVP complete + local demo-ready overlay |
-| Current task | Report visual analysis and PDF export polish verified; certified P9 provider work remains locked until human approval |
+| Current task | Sticky sidebar and persistent scan worker reliability fix verified; certified P9 provider work remains locked until human approval |
 | Last verified task | P8-T3 |
 | Last verified phase | P8 Deployment readiness |
 | MVP status | VERIFIED |
@@ -297,6 +297,16 @@ Status: VERIFIED on 2026-04-28 12:13:52 IST.
 The local demo UI now uses a professional Teal + Ink theme across the app shell, login, dashboard, cards, tables, forms, and common surfaces. The default app background is softly tinted, the sidebar uses a deep teal treatment, panels use warm off-white/mint surfaces, and primary actions use teal/ink colors.
 
 This is a visual-only demo polish pass. It does not change APIs, database schema, authentication, RBAC, scan provider behavior, budget logic, or production sign-off status.
+
+## 7F. Demo sticky sidebar and scan queue reliability
+
+Status: VERIFIED on 2026-04-28 12:32:37 IST.
+
+The authenticated desktop sidebar is sticky and scroll-safe. The scan worker now runs persistently with `npm run worker`, polling for queued scan jobs every 2 seconds while idle, and `npm run worker:once` remains available for one-off debugging.
+
+Submission lifecycle panels keep the existing automatic refresh behavior and now show clearer local-demo worker guidance plus latest job status, scan mode, attempt count, provider id, and any visible error. Super-admin scan creation forms now label the tenant selector as `Institution / Tenant` and explain that super admins choose the institution workspace while tenant admins and users use their own institution automatically.
+
+This is a local demo reliability and UX fix. It does not change APIs, database schema, authentication, RBAC, tenant isolation, scan provider behavior, budget logic, or report generation.
 
 ## 8. Canonical roles
 

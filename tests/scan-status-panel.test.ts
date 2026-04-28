@@ -3,6 +3,7 @@ import {
   buildScanTimeline,
   formatProbabilityAsPercent,
   formatScoreAsPercent,
+  getScanStatusHelp,
   getScanStatusLabel,
   shouldShowScanAction
 } from "../src/components/submissions/scan-status-panel";
@@ -49,6 +50,16 @@ describe("scan status panel helpers", () => {
     expect(getScanStatusLabel("SCAN_COMPLETE")).toBe("Scan complete");
     expect(formatScoreAsPercent(42.4)).toBe("42%");
     expect(formatProbabilityAsPercent(0.876)).toBe("88%");
+  });
+
+  it("explains queued and running scans without requiring manual refresh", () => {
+    expect(getScanStatusHelp("SCAN_QUEUED")).toContain(
+      "updates automatically"
+    );
+    expect(getScanStatusHelp("SCAN_QUEUED")).toContain("npm run worker");
+    expect(getScanStatusHelp("SCANNING")).toContain("updates automatically");
+    expect(getScanStatusHelp("FAILED")).toContain("latest scan stopped");
+    expect(getScanStatusHelp("READY_FOR_SCAN")).toBeNull();
   });
 
   it("polls only while scan status can change in the background", () => {

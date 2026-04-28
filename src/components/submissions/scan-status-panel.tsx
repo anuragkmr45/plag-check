@@ -52,6 +52,7 @@ export function ScanStatusPanel({
   wordCount = 0
 }: ScanStatusPanelProps): React.JSX.Element {
   const latestResult = status === "SCAN_COMPLETE" ? scanSummary?.latestResult : null;
+  const statusHelp = getScanStatusHelp(status);
 
   return (
     <section className="rounded-lg border border-slate-200 bg-white">
@@ -99,10 +100,37 @@ export function ScanStatusPanel({
           <p className="text-sm font-medium text-slate-900">
             {getScanStatusLabel(status)}
           </p>
+          {statusHelp ? (
+            <p className="mt-1 text-xs leading-5 text-slate-600">
+              {statusHelp}
+            </p>
+          ) : null}
           {scanSummary?.latestJob ? (
-            <p className="mt-1 text-xs text-slate-500">
-              Provider {scanSummary.latestJob.provider} · attempt{" "}
-              {scanSummary.latestJob.attempts}
+            <dl className="mt-3 grid gap-2 text-xs text-slate-600 sm:grid-cols-4">
+              <div>
+                <dt className="font-medium text-slate-800">Job status</dt>
+                <dd>{scanSummary.latestJob.status}</dd>
+              </div>
+              <div>
+                <dt className="font-medium text-slate-800">Scan mode</dt>
+                <dd className="capitalize">{scanSummary.latestJob.scanMode}</dd>
+              </div>
+              <div>
+                <dt className="font-medium text-slate-800">Attempts</dt>
+                <dd>{scanSummary.latestJob.attempts}</dd>
+              </div>
+              <div>
+                <dt className="font-medium text-slate-800">Provider</dt>
+                <dd>{scanSummary.latestJob.provider}</dd>
+              </div>
+            </dl>
+          ) : null}
+          {scanSummary?.latestJob?.errorMessage ? (
+            <p
+              className="mt-3 rounded-md border border-rose-200 bg-rose-50 px-3 py-2 text-xs text-rose-700"
+              role="alert"
+            >
+              {scanSummary.latestJob.errorMessage}
             </p>
           ) : null}
         </div>
@@ -213,6 +241,19 @@ export function getScanStatusLabel(status: SubmissionStatus): string {
       return "Scan failed";
     default:
       return "Scan not ready";
+  }
+}
+
+export function getScanStatusHelp(status: SubmissionStatus): string | null {
+  switch (status) {
+    case "SCAN_QUEUED":
+      return "This page updates automatically while the scan waits in the queue. In local demo mode, keep npm run worker running in a separate terminal.";
+    case "SCANNING":
+      return "This page updates automatically while analysis is running. In local demo mode, keep npm run worker running in a separate terminal.";
+    case "FAILED":
+      return "The latest scan stopped with an error. Check the job details below before retrying.";
+    default:
+      return null;
   }
 }
 

@@ -27,6 +27,11 @@ export type ScanWorkerIterationResult =
       status: "failed";
     };
 
+export type ScanWorkerLoopResult = {
+  iterations: number;
+  stopped: boolean;
+};
+
 export type ScanWorkerOptions = {
   claimNextJob?: () => Promise<ScanJob | null>;
   markFailed?: (
@@ -44,6 +49,14 @@ export type ScanWorkerOptions = {
   processor?: ScanWorkerProcessor;
 };
 
+export type ScanWorkerLoopOptions = ScanWorkerOptions & {
+  idleDelayMs?: number;
+  maxIterations?: number;
+  onIteration?: (result: ScanWorkerIterationResult) => Promise<void> | void;
+  signal?: AbortSignal;
+  sleep?: (milliseconds: number, signal?: AbortSignal) => Promise<void>;
+};
+
 export async function runScanWorkerOnce(
   options: ScanWorkerOptions = {}
 ): Promise<ScanWorkerIterationResult> {
@@ -53,6 +66,37 @@ export async function runScanWorkerOnce(
     onProcessingFailure: handleScanJobProcessingFailure,
     ...options
   });
+}
+
+export async function runScanWorkerLoop(
+  options: ScanWorkerLoopOptions = {}
+): Promise<ScanWorkerLoopResult> {
+  const idleDelayMs = options.idleDelayMs ?? 2_000;
+  const sleep = options.sleep ?? sleepFor;
+  let iterations = 0;
+
+  while (!options.signal?.aborted) {
+    const result = await runScanWorkerOnce(options);
+    iterations += 1;
+
+    await options.onIteration?.(result);
+
+    if (options.maxIterations && iterations >= options.maxIterations) {
+      return {
+        iterations,
+        stopped: true
+      };
+    }
+
+    if (result.status === "idle") {
+      await sleep(idleDelayMs, options.signal);
+    }
+  }
+
+  return {
+    iterations,
+    stopped: true
+  };
 }
 
 export async function processNextScanJob(
@@ -93,4 +137,28 @@ export async function processNextScanJob(
       status: "failed"
     };
   }
+}
+
+function sleepFor(
+  milliseconds: number,
+  signal?: AbortSignal
+): Promise<void> {
+  if (signal?.aborted || milliseconds <= 0) {
+    return Promise.resolve();
+  }
+
+  return new Promise((resolve) => {
+    const timeout = setTimeout(resolve, milliseconds);
+
+    signal?.addEventListener(
+      "abort",
+      () => {
+        clearTimeout(timeout);
+        resolve();
+      },
+      {
+        once: true
+      }
+    );
+  });
 }

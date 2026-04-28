@@ -7,6 +7,7 @@ import {
 } from "../src/lib/jobs/scan-queue";
 import {
   processNextScanJob,
+  runScanWorkerLoop,
   runScanWorkerOnce,
   type ScanWorkerProcessor
 } from "../src/server/workers/scan-worker";
@@ -145,5 +146,56 @@ describe("scan worker iteration", () => {
       },
       status: "failed"
     });
+  });
+
+  it("keeps processing repeated jobs without sleeping between active iterations", async () => {
+    const processedJobIds: string[] = [];
+    const sleepCalls: number[] = [];
+
+    const result = await runScanWorkerLoop({
+      claimNextJob: async () => ({
+        ...scanJob,
+        id: `${scanJob.id.slice(0, -1)}${processedJobIds.length + 1}`
+      }),
+      markSucceeded: async (jobId) => ({
+        ...scanJob,
+        id: jobId,
+        status: "SUCCEEDED"
+      }),
+      maxIterations: 2,
+      processor: async (job) => {
+        processedJobIds.push(job.id);
+      },
+      sleep: async (milliseconds) => {
+        sleepCalls.push(milliseconds);
+      }
+    });
+
+    expect(result).toEqual({
+      iterations: 2,
+      stopped: true
+    });
+    expect(processedJobIds).toHaveLength(2);
+    expect(sleepCalls).toEqual([]);
+  });
+
+  it("sleeps on idle iterations and stops cleanly when aborted", async () => {
+    const controller = new AbortController();
+    const sleepCalls: number[] = [];
+
+    const result = await runScanWorkerLoop({
+      claimNextJob: async () => null,
+      signal: controller.signal,
+      sleep: async (milliseconds) => {
+        sleepCalls.push(milliseconds);
+        controller.abort();
+      }
+    });
+
+    expect(result).toEqual({
+      iterations: 1,
+      stopped: true
+    });
+    expect(sleepCalls).toEqual([2_000]);
   });
 });

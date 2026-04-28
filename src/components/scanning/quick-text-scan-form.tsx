@@ -57,7 +57,7 @@ export function QuickTextScanForm({
     }
 
     if (tenantOptions.length > 0 && !tenantId) {
-      setError("Choose the tenant for this scan.");
+      setError("Choose the institution workspace for this scan.");
       return;
     }
 
@@ -144,7 +144,7 @@ export function QuickTextScanForm({
               className="block text-sm font-medium text-slate-800"
               htmlFor={`${modeLabel}-tenant`}
             >
-              Tenant
+              Institution / Tenant
             </label>
             <select
               className="w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm text-slate-950 outline-none transition focus:border-slate-900 focus:ring-2 focus:ring-slate-200"
@@ -152,13 +152,17 @@ export function QuickTextScanForm({
               name="tenantId"
               required
             >
-              <option value="">Choose tenant</option>
+              <option value="">Choose institution / tenant</option>
               {tenantOptions.map((tenant) => (
                 <option key={tenant.id} value={tenant.id}>
                   {tenant.name} ({tenant.slug})
                 </option>
               ))}
             </select>
+            <p className="text-xs text-slate-600">
+              Super admins choose the institution workspace; tenant admins and
+              users use their own institution automatically.
+            </p>
           </div>
         ) : null}
         <div className="grid grid-cols-3 gap-2 self-end">

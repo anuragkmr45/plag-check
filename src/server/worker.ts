@@ -1,11 +1,32 @@
 import { closeDatabaseConnection } from "../lib/db";
-import { runScanWorkerOnce } from "./workers/scan-worker";
+import {
+  runScanWorkerLoop,
+  type ScanWorkerIterationResult
+} from "./workers/scan-worker";
 
 async function main(): Promise<void> {
-  const result = await runScanWorkerOnce();
+  const controller = new AbortController();
 
+  for (const signal of ["SIGINT", "SIGTERM"] as const) {
+    process.once(signal, () => {
+      console.log(`Received ${signal}. Stopping scan worker...`);
+      controller.abort();
+    });
+  }
+
+  console.log("Scan worker started. Waiting for queued jobs...");
+
+  const result = await runScanWorkerLoop({
+    onIteration: logWorkerIteration,
+    signal: controller.signal
+  });
+
+  console.log(`Scan worker stopped after ${result.iterations} iterations.`);
+}
+
+function logWorkerIteration(result: ScanWorkerIterationResult): void {
   if (result.status === "idle") {
-    console.log("No queued scan jobs.");
+    console.log("No queued scan jobs. Waiting...");
     return;
   }
 

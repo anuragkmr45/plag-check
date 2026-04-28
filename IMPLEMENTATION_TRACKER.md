@@ -22,7 +22,7 @@ Before every coding step, the agent must:
 |---|---|
 | MVP implementation status | VERIFIED |
 | Current phase | MVP complete + local demo-ready overlay |
-| Current task | Report visual analysis and PDF export polish VERIFIED; certified P9 provider work remains locked until human approval |
+| Current task | Sticky sidebar and persistent scan worker reliability fix VERIFIED; certified P9 provider work remains locked until human approval |
 | Last verified task | P8-T3 |
 | Last phase verified | Phase 8 |
 | Demo Real status | VERIFIED for local product demonstration with fallbacks |
@@ -160,6 +160,78 @@ Manual/API verification:
 
 Remaining issues:
 - None.
+
+Human intervention required:
+- None.
+
+---
+
+### Demo overlay bugfix: sticky sidebar and persistent scan worker
+
+Status: VERIFIED
+
+Verification date: 2026-04-28 12:32:37 IST
+
+Issue:
+- The desktop sidebar scrolled away on long authenticated pages.
+- Queued scans could remain stuck because `npm run worker` processed only one iteration and no persistent worker process was running.
+- Submission lifecycle UI did not clearly explain that local demo queue processing requires the worker process.
+- Super-admin scan forms used the ambiguous label `Tenant`.
+
+Scope:
+- Made the desktop dashboard shell sidebar sticky and scroll-safe.
+- Converted `npm run worker` into a persistent polling worker while preserving one-shot behavior through `npm run worker:once`.
+- Added scan lifecycle helper text and latest job diagnostics.
+- Renamed scan creation tenant fields to `Institution / Tenant` with concise helper text.
+- Drained the currently queued local demo scan jobs.
+
+Changed files:
+- AGENTS.md
+- IMPLEMENTATION_TRACKER.md
+- package.json
+- src/components/dashboard/dashboard-shell.tsx
+- src/components/scanning/quick-text-scan-form.tsx
+- src/components/submissions/scan-status-panel.tsx
+- src/components/submissions/submission-create-upload-form.tsx
+- src/server/worker.ts
+- src/server/worker-once.ts
+- src/server/workers/scan-worker.ts
+- tests/demo-ui-reliability.test.ts
+- tests/scan-queue.test.ts
+- tests/scan-status-panel.test.ts
+
+Database migrations:
+- None
+
+Commands run:
+- `npm run test -- tests/scan-queue.test.ts tests/scan-status-panel.test.ts tests/demo-ui-reliability.test.ts` — PASS, 3 files and 17 tests passed.
+- `npm run typecheck` — PASS.
+- `npm run lint` — PASS.
+- `npm run test` — PASS, 32 files and 138 tests passed.
+- `npm run build` — PASS.
+- `npm run worker:once` — PASS, processed submission `5086198d-2085-4e74-9cdf-361924f02c7a`.
+- Initial DB diagnostic using top-level await — FAIL because `tsx -e` emitted CJS output; reran inside an async IIFE.
+- Async DB diagnostic — PASS, target submission moved to `SCAN_COMPLETE`; two queued jobs remained.
+- `npm run worker` — PASS for persistent drain; processed the two remaining queued jobs and then idled. Stopped manually with SIGINT after verification.
+- Final async DB diagnostic — PASS, `activeCount=0`; latest queued jobs all `SUCCEEDED`.
+- `npm run worker:once` — PASS, reported `No queued scan jobs.`
+- `npm run start -- -p 3100` — PASS for browser smoke testing.
+
+Manual/browser verification:
+- Playwright confirmed `aside.pc-sidebar` computed `position: sticky`, `top: 0px`, `overflow-y: auto`, and includes `sticky top-0 h-screen overflow-y-auto`.
+- Browser-smoked `/scan/new`, `/plagiarism-checker`, `/ai-detector`, and `/grammar-checker`; each showed `Institution / Tenant` and institution workspace helper text.
+- Browser-smoked `/submissions/5086198d-2085-4e74-9cdf-361924f02c7a`; page showed `SCAN_COMPLETE`, `Scan complete`, and an `Open report` link.
+- Browser-smoked `/submissions`, `/reports`, `/reviewer/queue`, and `/admin/settings`; pages loaded with the authenticated sidebar.
+- Confirmed current local tenant choice is `Demo Institution`.
+
+Queue verification:
+- Before drain, submission `5086198d-2085-4e74-9cdf-361924f02c7a` had a `QUEUED` job with `attempts=0`.
+- After `worker:once`, the target submission was `SCAN_COMPLETE`; job `cab0bf08-7f1c-48f3-bf45-5ea7ce1ab6f6` was `SUCCEEDED` with `attempts=1`.
+- Persistent worker drained the remaining queued jobs for `Demo originality check1` and `Demo plagiarism check`.
+- Final DB check returned no active `QUEUED` or `RUNNING` scan jobs.
+
+Remaining issues:
+- None for sticky sidebar, tenant wording, lifecycle diagnostics, or queued scan processing.
 
 Human intervention required:
 - None.
