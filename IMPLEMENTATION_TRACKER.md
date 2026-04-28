@@ -164,6 +164,54 @@ Remaining issues:
 Human intervention required:
 - None.
 
+---
+
+### Demo overlay enhancement: Teal + Ink UI refresh
+
+Status: VERIFIED
+
+Verification date: 2026-04-28 12:13:52 IST
+
+Scope:
+- Refreshed the app visual system from plain white/slate surfaces to a professional Teal + Ink theme.
+- Added shared theme tokens and broad surface overrides for existing Tailwind-heavy panels, forms, buttons, borders, and text.
+- Updated the authenticated shell with a deep teal sidebar, active navigation states, and a translucent warm header.
+- Updated dashboard cards, meters, feature budget cards, login, and the root page with richer professional color treatment.
+- Preserved tenant branding support and did not change backend behavior.
+
+Changed files:
+- AGENTS.md
+- IMPLEMENTATION_TRACKER.md
+- src/app/globals.css
+- src/app/login/page.tsx
+- src/app/page.tsx
+- src/components/auth/logout-button.tsx
+- src/components/dashboard/dashboard-shell.tsx
+- src/components/dashboard/dashboard-navigation.tsx
+- src/features/analytics/admin-analytics-dashboard.tsx
+
+Database migrations:
+- None
+
+Commands run:
+- `npm run lint` — PASS
+- `npm run typecheck` — PASS
+- `npm run test` — PASS, 31 files and 133 tests passed
+- `npm run build` — PASS
+- `npm run start -- -p 3100` — PASS for browser smoke testing
+
+Manual verification:
+- Browser-smoked `/login`, `/dashboard`, `/scan/new`, `/plagiarism-checker`, `/ai-detector`, `/grammar-checker`, `/submissions`, `/reports`, `/reviewer/queue`, `/admin/settings`, a submission detail page, and a report page.
+- Checked desktop dashboard and mobile report view with Playwright screenshots.
+- Verified sidebar/header readability, active navigation styling, non-white app background, tinted cards/forms/tables, and no obvious overlap on desktop or mobile.
+- Confirmed the feature budget dashboard cards still use software feature labels and do not expose vendor/API names.
+
+Remaining issues:
+- None for the visual refresh.
+
+Human intervention required:
+- None.
+
 ### Demo overlay bugfix: Tavily query length and rescan
 
 Status: VERIFIED

@@ -290,6 +290,14 @@ Submission detail pages now poll the tenant-scoped submission status endpoint wh
 
 This is a lightweight polling enhancement for the existing PostgreSQL-backed worker flow. It is not a WebSocket/SSE implementation and does not replace the requirement to run the worker process.
 
+## 7E. Demo Teal + Ink UI refresh
+
+Status: VERIFIED on 2026-04-28 12:13:52 IST.
+
+The local demo UI now uses a professional Teal + Ink theme across the app shell, login, dashboard, cards, tables, forms, and common surfaces. The default app background is softly tinted, the sidebar uses a deep teal treatment, panels use warm off-white/mint surfaces, and primary actions use teal/ink colors.
+
+This is a visual-only demo polish pass. It does not change APIs, database schema, authentication, RBAC, scan provider behavior, budget logic, or production sign-off status.
+
 ## 8. Canonical roles
 
 Use exactly these roles:

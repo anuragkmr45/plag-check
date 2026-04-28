@@ -36,29 +36,29 @@ export function AdminAnalyticsDashboard({
 
       <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
         <MetricCard
-          accentClassName="border-l-emerald-500"
           label="Submissions"
+          tone="emerald"
           value={formatMetricNumber(analytics.totalSubmissions)}
         />
         <MetricCard
-          accentClassName="border-l-sky-500"
           label="Words processed this month"
+          tone="sky"
           value={formatMetricNumber(analytics.wordsProcessedThisMonth)}
         />
         <MetricCard
-          accentClassName="border-l-violet-500"
           label="Scans completed this month"
+          tone="teal"
           value={formatMetricNumber(analytics.scansCompletedThisMonth)}
         />
         <MetricCard
-          accentClassName="border-l-rose-500"
           label="High-risk submissions"
+          tone="rose"
           value={formatMetricNumber(highRiskCount)}
         />
       </div>
 
       <div className="grid gap-4 xl:grid-cols-2">
-        <section className="rounded-lg border border-slate-200 bg-white">
+        <section className="pc-panel rounded-lg border">
           <SectionHeader
             description="Current submission distribution by workflow status."
             title="Submissions by status"
@@ -69,7 +69,7 @@ export function AdminAnalyticsDashboard({
           />
         </section>
 
-        <section className="rounded-lg border border-slate-200 bg-white">
+        <section className="pc-panel rounded-lg border">
           <SectionHeader
             description="Active and inactive users are included by role."
             title="Users by role"
@@ -82,7 +82,7 @@ export function AdminAnalyticsDashboard({
       </div>
 
       <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_360px]">
-        <section className="rounded-lg border border-slate-200 bg-white">
+        <section className="pc-panel rounded-lg border">
           <SectionHeader
             description="Usage is measured against tenant limits or global tenant limit totals."
             title="Monthly usage"
@@ -103,7 +103,7 @@ export function AdminAnalyticsDashboard({
           </div>
         </section>
 
-        <section className="rounded-lg border border-slate-200 bg-white">
+        <section className="pc-panel rounded-lg border">
           <SectionHeader title="Risk thresholds" />
           <dl className="space-y-3 p-5 text-sm">
             <MetadataItem
@@ -127,7 +127,7 @@ export function AdminAnalyticsDashboard({
       </div>
 
       {analytics.featureBudgets.length > 0 ? (
-        <section className="rounded-lg border border-slate-200 bg-white">
+        <section className="pc-panel rounded-lg border">
           <SectionHeader
             description="Remaining monthly feature capacity for this demo workspace."
             title="Feature capacity"
@@ -144,20 +144,27 @@ export function AdminAnalyticsDashboard({
 }
 
 function MetricCard({
-  accentClassName,
   label,
+  tone,
   value
 }: {
-  accentClassName: string;
   label: string;
+  tone: "emerald" | "rose" | "sky" | "teal";
   value: string;
 }): React.JSX.Element {
+  const toneClassName = {
+    emerald: "from-emerald-50 to-teal-50 text-emerald-950 border-emerald-200",
+    rose: "from-rose-50 to-amber-50 text-rose-950 border-rose-200",
+    sky: "from-sky-50 to-teal-50 text-sky-950 border-sky-200",
+    teal: "from-teal-50 to-emerald-50 text-teal-950 border-teal-200"
+  }[tone];
+
   return (
     <section
-      className={`rounded-lg border border-l-4 border-slate-200 bg-white p-5 ${accentClassName}`}
+      className={`rounded-lg border bg-gradient-to-br p-5 shadow-sm ${toneClassName}`}
     >
-      <h2 className="text-sm font-medium text-slate-600">{label}</h2>
-      <p className="mt-3 text-3xl font-semibold text-slate-950">{value}</p>
+      <h2 className="text-sm font-medium opacity-75">{label}</h2>
+      <p className="mt-3 text-3xl font-semibold">{value}</p>
     </section>
   );
 }
@@ -212,11 +219,11 @@ function BarChart({
               aria-valuemax={100}
               aria-valuemin={0}
               aria-valuenow={percent}
-              className="h-2 rounded-full bg-slate-100"
+              className="h-2 rounded-full bg-teal-100"
               role="meter"
             >
               <div
-                className="h-2 rounded-full bg-slate-900"
+                className="h-2 rounded-full bg-teal-700"
                 style={{ width: `${percent}%` }}
               />
             </div>
@@ -251,7 +258,7 @@ function UsageMeter({
         aria-valuemax={100}
         aria-valuemin={0}
         aria-valuenow={percent}
-        className="h-3 rounded-full bg-slate-100"
+        className="h-3 rounded-full bg-teal-100"
         role="meter"
       >
         <div
@@ -278,7 +285,7 @@ function FeatureBudgetCard({
       : "bg-emerald-600";
 
   return (
-    <section className="rounded-lg border border-slate-200 p-4">
+    <section className="rounded-lg border border-teal-100 bg-white/55 p-4 shadow-sm">
       <div className="flex items-start justify-between gap-3">
         <div>
           <h3 className="text-sm font-semibold text-slate-950">
@@ -313,7 +320,7 @@ function FeatureBudgetCard({
         aria-valuemax={100}
         aria-valuemin={0}
         aria-valuenow={budget.percentUsed}
-        className="mt-4 h-2 rounded-full bg-slate-100"
+        className="mt-4 h-2 rounded-full bg-teal-100"
         role="meter"
       >
         <div
