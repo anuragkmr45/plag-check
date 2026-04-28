@@ -11,14 +11,27 @@
     "test": "vitest run --passWithNoTests",
     "db:generate": "drizzle-kit generate",
     "db:migrate": "drizzle-kit migrate",
+    "db:push": "drizzle-kit push",
+    "db:seed": "tsx --env-file-if-exists=.env scripts/seed.ts",
+    "db:seed:demo": "tsx --env-file-if-exists=.env scripts/seed-demo.ts",
     "db:studio": "drizzle-kit studio",
-    "worker": "tsx src/server/worker.ts"
+    "worker": "tsx --env-file-if-exists=.env src/server/worker.ts"
   },
   "dependencies": {
+    "@aws-sdk/client-s3": "^3.1037.0",
+    "@aws-sdk/s3-request-presigner": "^3.1037.0",
+    "@types/pdfkit": "^0.17.6",
+    "@types/pg": "^8.20.0",
+    "argon2": "^0.44.0",
     "drizzle-orm": "^0.45.2",
+    "mammoth": "^1.12.0",
     "next": "^16.2.4",
+    "pdf-parse": "^2.4.5",
+    "pdfkit": "^0.18.0",
+    "pg": "^8.20.0",
     "react": "^19.2.5",
-    "react-dom": "^19.2.5"
+    "react-dom": "^19.2.5",
+    "zod": "^4.3.6"
   },
   "devDependencies": {
     "@eslint/eslintrc": "^3.3.5",
